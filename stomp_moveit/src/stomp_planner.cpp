@@ -196,6 +196,7 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   Eigen::MatrixXd initial_parameters;
   bool use_seed = getSeedParameters(initial_parameters);
 
+  ROS_INFO_STREAM("initial_parameters: " << use_seed); // initial_parametersの表示(0/1)
 
   // create timeout timer
   ros::WallDuration allowed_time(request_.allowed_planning_time);
@@ -234,7 +235,7 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   }
   else
   {
-
+    ROS_INFO_STREAM("else");
     // extracting start and goal
     Eigen::VectorXd start, goal;
     if(!getStartAndGoal(start,goal))
