@@ -174,6 +174,9 @@ bool StompPlanner::solve(planning_interface::MotionPlanResponse &res)
 
 bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
 {
+  std::string userInput;
+  std::cout << "Do you want to use the initial trajectory you set (y/n): ";
+  std::getline(std::cin, userInput);
   using namespace stomp;
 
   // initializing response
@@ -196,8 +199,6 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   Eigen::MatrixXd initial_parameters;
   bool use_seed = getSeedParameters(initial_parameters);
 
-  ROS_INFO_STREAM("initial_parameters: " << use_seed); // initial_parametersの表示(0/1)
-
   // create timeout timer
   ros::WallDuration allowed_time(request_.allowed_planning_time);
   ROS_WARN_COND(TIMEOUT_INTERVAL > request_.allowed_planning_time,
@@ -215,14 +216,13 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
 
   },false);
 
-
   if (use_seed)
   {
     ROS_INFO("%s Seeding trajectory from MotionPlanRequest",getName().c_str());
 
     // updating time step in stomp configuraion
     config_copy.num_timesteps = initial_parameters.cols();
-
+    
     // setting up up optimization task
     if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
     {
@@ -233,26 +233,52 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
     stomp_->setConfig(config_copy);
     planning_success = stomp_->solve(initial_parameters, parameters);
   }
-  else
-  {
-    ROS_INFO_STREAM("else");
-    // extracting start and goal
-    Eigen::VectorXd start, goal;
-    if(!getStartAndGoal(start,goal))
-    {
-      res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN;
-      return false;
-    }
 
-    // setting up up optimization task
-    if(!task_->setMotionPlanRequest(planning_scene_,request_, config_copy,res.error_code_))
-    {
-      res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-      return false;
-    }
+  else {
+    if (userInput == "y" || userInput == "Y") {
+      ROS_ERROR("Seeding trajectory from the initial trajectory you set!!!");
+      const int rows = 6;
+      const int cols = 6;
+      Eigen::MatrixXd initial_parameters(rows, cols);
+      initial_parameters <<
+        -0.28912021930079224, -0.7374307050147539, 0.03881262862609702, -4.1384655773413215e-05, 0.6986102611929352, -0.28911170882770687,
+        -0.4844282623125231, -0.7933556130523591, -0.025423693838843242, -5.6972393663201615e-05, 0.8187715253421821, -0.48442063260887025,
+        -0.895562098715085, -0.6598750755758358, -0.28372131382921406, 7.861715160206728e-05, 0.9435981263050977, -0.8955634650057371,
+        -0.08629977302117542, -1.1809247415149215, -0.40353891642599127, -7.368979951838384e-05, 1.5844634067130157, -0.08629956765413471,
+        1.0298651498471187, -0.010589338482162702, -0.6688512648914742, 8.609715003160545e-05, 0.6794686474917837, 1.0298623166113519,
+        1.2077239944510092, 0.5542097600520925, -1.4574245443191476, 0.00012466530963539668, 0.9032558845852732, 1.2077194982217732;
+      
+      Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
+      // updating time step in stomp configuraion
+      config_copy.num_timesteps = initial_parameters_transpose.cols();
 
-    stomp_->setConfig(config_copy);
-    planning_success = stomp_->solve(start,goal,parameters);
+      // setting up up optimization task
+      if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
+      {
+        res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+        return false;
+      }
+      stomp_->setConfig(config_copy);
+      planning_success = stomp_->solve(initial_parameters_transpose, parameters);
+    }
+    if (userInput == "n" || userInput == "N") {
+      // extracting start and goal
+      Eigen::VectorXd start, goal;
+      if(!getStartAndGoal(start,goal))
+      {
+        res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN;
+        return false;
+      }
+
+      // setting up up optimization task
+      if(!task_->setMotionPlanRequest(planning_scene_,request_, config_copy,res.error_code_))
+      {
+        res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+        return false;
+      }
+      stomp_->setConfig(config_copy);
+      planning_success = stomp_->solve(start,goal,parameters);
+    }
   }
 
   // stopping timer
@@ -557,6 +583,8 @@ bool StompPlanner::extractSeedTrajectory(const moveit_msgs::MotionPlanRequest& r
 
 moveit_msgs::TrajectoryConstraints StompPlanner::encodeSeedTrajectory(const trajectory_msgs::JointTrajectory &seed)
 {
+  ROS_INFO_STREAM("encodeSeedTrajectory関数を使用します");
+
   moveit_msgs::TrajectoryConstraints res;
 
   const auto dof = seed.joint_names.size();
