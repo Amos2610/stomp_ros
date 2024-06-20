@@ -34,3 +34,4 @@ MotionPlanResponse res;
 planner.solve(res);
 ``` 
 There is no current way to set this through the MoveGroupInterface class. 
+# stomp_ros
