@@ -235,31 +235,133 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   }
 
   else {
+
     if (userInput == "y" || userInput == "Y") {
       ROS_ERROR("Seeding trajectory from the initial trajectory you set!!!");
-      const int rows = 6;
-      const int cols = 6;
-      Eigen::MatrixXd initial_parameters(rows, cols);
-      initial_parameters <<
-        -0.28912021930079224, -0.7374307050147539, 0.03881262862609702, -4.1384655773413215e-05, 0.6986102611929352, -0.28911170882770687,
-        -0.4844282623125231, -0.7933556130523591, -0.025423693838843242, -5.6972393663201615e-05, 0.8187715253421821, -0.48442063260887025,
-        -0.895562098715085, -0.6598750755758358, -0.28372131382921406, 7.861715160206728e-05, 0.9435981263050977, -0.8955634650057371,
-        -0.08629977302117542, -1.1809247415149215, -0.40353891642599127, -7.368979951838384e-05, 1.5844634067130157, -0.08629956765413471,
-        1.0298651498471187, -0.010589338482162702, -0.6688512648914742, 8.609715003160545e-05, 0.6794686474917837, 1.0298623166113519,
-        1.2077239944510092, 0.5542097600520925, -1.4574245443191476, 0.00012466530963539668, 0.9032558845852732, 1.2077194982217732;
-      
-      Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-      // updating time step in stomp configuraion
-      config_copy.num_timesteps = initial_parameters_transpose.cols();
+      // int seed = 1;
+      // std::cout << "Enter the seed number: ";
+      // std::cin >> seed;
+      std::string userInput2;
+      std::cout << "watanabe";
+      std::getline(std::cin, userInput2);
 
-      // setting up up optimization task
-      if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
-      {
-        res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-        return false;
+      if (userInput2 == "1") {
+          const int rows = 12;
+          const int cols = 6;
+          // printf("rows: %d, cols: %d\n", rows, cols);
+          // initial_parameters.resize(rows, cols);
+          // printf("rows: %d, cols: %d\n", initial_parameters.rows(), initial_parameters.cols());
+          Eigen::MatrixXd initial_parameters(rows, cols);
+            /* ここに行列の初期値を設定 */
+          initial_parameters <<
+                0.7760606615384615, -0.07116415999999996, -1.5177242676923077, 0.0011898815384615387, 1.589898823076923, 0.7756431069230769,
+                0.8200456930769231, 0.028724220000000012, -1.5731555053846156, 0.001239543076923077, 1.545368796153846, 0.8195588838461538,
+                0.8640307246153847, 0.1286126, -1.6285867430769232, 0.0012892046153846152, 1.5008387692307692, 0.8634746607692307,
+                0.9080157561538462, 0.22850098000000008, -1.684017980769231, 0.0013388661538461539, 1.4563087423076921, 0.9073904376923078,
+                0.9520007876923077, 0.32838936, -1.7394492184615384, 0.0013885276923076926, 1.4117787153846155, 0.9513062146153849,
+                0.9959858192307692, 0.42827773999999996, -1.7948804561538463, 0.0014381892307692309, 1.3672486884615382, 0.9952219915384616,
+                1.039970850769231, 0.5281661199999999, -1.850311693846154, 0.0014878507692307691, 1.3227186615384616, 1.0391377684615384,
+                1.0839558823076925, 0.6280545000000001, -1.9057429315384617, 0.0015375123076923076, 1.2781886346153843, 1.0830535453846155,
+                1.127940913846154, 0.7279428800000004, -1.9611741692307694, 0.0015871738461538465, 1.2336586076923077, 1.1269693223076926,
+                1.1719259453846154, 0.82783126, -2.0166054069230768, 0.0016368353846153848, 1.1891285807692307, 1.1708850992307693,
+                1.215910976923077, 0.9277196400000001, -2.072036644615385, 0.001686496923076923, 1.1445985538461536, 1.2148008761538462,
+                1.2598960084615385, 1.02760802, -2.1274678823076925, 0.001736158461538462, 1.1000685269230763, 1.2587166530769232;
+          
+          std::cout << "initial_parameters:" << std::endl;
+          std::cout << initial_parameters << std::endl;
+
+          Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
+          std::cout << "initial_parameters_transpose:" << std::endl;
+          std::cout << initial_parameters_transpose << std::endl;
+          // updating time step in stomp configuraion
+          config_copy.num_timesteps = initial_parameters_transpose.cols();
+
+          // setting up up optimization task
+          if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
+          {
+            res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+            return false;
+          }
+          stomp_->setConfig(config_copy);
+          planning_success = stomp_->solve(initial_parameters_transpose, parameters);
+
+      } 
+      else if (userInput2 == "2") {
+          const int rows = 12;
+          const int cols = 6;
+          initial_parameters.resize(rows, cols);
+          Eigen::MatrixXd initial_parameters(rows, cols);
+          initial_parameters <<
+                1.2598960084615385, 1.02760802, -2.1274678823076925, 0.001736158461538462, 1.1000685269230763, 1.2587166530769232,
+                1.215910976923077, 0.9277196400000001, -2.072036644615385, 0.001686496923076923, 1.1445985538461536, 1.2148008761538462,
+                1.1719259453846154, 0.82783126, -2.0166054069230768, 0.0016368353846153848, 1.1891285807692307, 1.1708850992307693,
+                1.127940913846154, 0.7279428800000004, -1.9611741692307694, 0.0015871738461538465, 1.2336586076923077, 1.1269693223076926,
+                1.0839558823076925, 0.6280545000000001, -1.9057429315384617, 0.0015375123076923076, 1.2781886346153843, 1.0830535453846155,
+                1.039970850769231, 0.5281661199999999, -1.850311693846154, 0.0014878507692307691, 1.3227186615384616, 1.0391377684615384,
+                0.9959858192307692, 0.42827773999999996, -1.7948804561538463, 0.0014381892307692309, 1.3672486884615382, 0.9952219915384616,
+                0.9520007876923077, 0.32838936, -1.7394492184615384, 0.0013885276923076926, 1.4117787153846155, 0.9513062146153849,
+                0.9080157561538462, 0.22850098000000008, -1.684017980769231, 0.0013388661538461539, 1.4563087423076921, 0.9073904376923078,
+                0.8640307246153847, 0.1286126, -1.6285867430769232, 0.0012892046153846152, 1.5008387692307692, 0.8634746607692307,
+                0.8200456930769231, 0.028724220000000012, -1.5731555053846156, 0.001239543076923077, 1.545368796153846, 0.8195588838461538,
+                0.7760606615384615, -0.07116415999999996, -1.5177242676923077, 0.0011898815384615387, 1.589898823076923, 0.7756431069230769;
+
+          Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
+          std::cout << "initial_parameters_transpose:" << std::endl;
+          std::cout << initial_parameters_transpose << std::endl;
+          // updating time step in stomp configuraion
+          config_copy.num_timesteps = initial_parameters_transpose.cols();
+
+          // setting up up optimization task
+          if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
+          {
+            res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+            return false;
+          }
+          stomp_->setConfig(config_copy);
+          planning_success = stomp_->solve(initial_parameters_transpose, parameters);
+      } 
+      else {
+          std::cout << "Invalid seed number" << std::endl;
+          return 1;
       }
-      stomp_->setConfig(config_copy);
-      planning_success = stomp_->solve(initial_parameters_transpose, parameters);
+
+      // const int rows = 12;
+      // const int cols = 6;
+      // Eigen::MatrixXd initial_parameters(rows, cols);
+      
+      // // TODO: initial_parameters should be set by the user
+      
+      // initial_parameters <<
+      //       0.7760606615384615, -0.07116415999999996, -1.5177242676923077, 0.0011898815384615387, 1.589898823076923, 0.7756431069230769,
+      //       0.8200456930769231, 0.028724220000000012, -1.5731555053846156, 0.001239543076923077, 1.545368796153846, 0.8195588838461538,
+      //       0.8640307246153847, 0.1286126, -1.6285867430769232, 0.0012892046153846152, 1.5008387692307692, 0.8634746607692307,
+      //       0.9080157561538462, 0.22850098000000008, -1.684017980769231, 0.0013388661538461539, 1.4563087423076921, 0.9073904376923078,
+      //       0.9520007876923077, 0.32838936, -1.7394492184615384, 0.0013885276923076926, 1.4117787153846155, 0.9513062146153849,
+      //       0.9959858192307692, 0.42827773999999996, -1.7948804561538463, 0.0014381892307692309, 1.3672486884615382, 0.9952219915384616,
+      //       1.039970850769231, 0.5281661199999999, -1.850311693846154, 0.0014878507692307691, 1.3227186615384616, 1.0391377684615384,
+      //       1.0839558823076925, 0.6280545000000001, -1.9057429315384617, 0.0015375123076923076, 1.2781886346153843, 1.0830535453846155,
+      //       1.127940913846154, 0.7279428800000004, -1.9611741692307694, 0.0015871738461538465, 1.2336586076923077, 1.1269693223076926,
+      //       1.1719259453846154, 0.82783126, -2.0166054069230768, 0.0016368353846153848, 1.1891285807692307, 1.1708850992307693,
+      //       1.215910976923077, 0.9277196400000001, -2.072036644615385, 0.001686496923076923, 1.1445985538461536, 1.2148008761538462,
+      //       1.2598960084615385, 1.02760802, -2.1274678823076925, 0.001736158461538462, 1.1000685269230763, 1.2587166530769232;
+
+      // std::cout << "initial_parameters:" << std::endl;
+      // std::cout << initial_parameters << std::endl;
+      
+      // Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
+      // std::cout << "initial_parameters_transpose:" << std::endl;
+      // std::cout << initial_parameters_transpose << std::endl;
+      // // updating time step in stomp configuraion
+      // config_copy.num_timesteps = initial_parameters_transpose.cols();
+
+      // // setting up up optimization task
+      // if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
+      // {
+      //   res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+      //   return false;
+      // }
+      // stomp_->setConfig(config_copy);
+      // planning_success = stomp_->solve(initial_parameters_transpose, parameters);
     }
     if (userInput == "n" || userInput == "N") {
       // extracting start and goal

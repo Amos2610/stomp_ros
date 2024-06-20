@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/nishidalab/catkin_ws/src/stomp_ros/stomp_moveit/build/devel/setup.sh

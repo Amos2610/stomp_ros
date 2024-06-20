@@ -1,0 +1,8 @@
+prefix=/home/nishidalab/catkin_ws/src/stomp_ros/stomp_moveit/build/devel
+
+Name: stomp_moveit
+Description: Description of stomp_moveit
+Version: 0.1.1
+Cflags: -I/home/nishidalab/catkin_ws/src/stomp_ros/stomp_moveit/include -I/usr/include -I/usr/include/eigen3 -I/home/nishidalab/catkin_ws/devel/include
+Libs: -L${prefix}/lib -lstomp_moveit /usr/lib/x86_64-linux-gnu/libboost_system.so.1.71.0
+Requires: geometry_msgs kdl_parser moveit_core moveit_msgs moveit_ros_planning pluginlib roscpp tf trac_ik_lib visualization_msgs
