@@ -54,8 +54,24 @@ public:
    * @param config  The parameter containing the configuration data for this planning group, includes plugins specifications.
    * @param model   A pointer to the robot model.
    */
-  StompPlanner(const std::string& group,const XmlRpc::XmlRpcValue& config,const moveit::core::RobotModelConstPtr& model);
-  virtual ~StompPlanner();
+  StompPlanner(const std::string& group, const XmlRpc::XmlRpcValue& config, const moveit::core::RobotModelConstPtr& model);
+  ~StompPlanner();
+
+  // シングルトンインスタンスの取得
+  static StompPlanner& getInstance(const std::string& name = "", const std::string& robot_description = "");
+
+  void setParameters(const Eigen::MatrixXd& parameters, int rows, int cols);
+  Eigen::MatrixXd getInitialParameters() const;
+  int getRows() const;
+  int getCols() const;
+
+  // // 初期パラメータの取得
+  // Eigen::MatrixXd getInitialParameters() const { return initial_parameters_; }
+  // int getRows() const { return rows_; }
+  // int getCols() const { return cols_; }
+  
+  // StompPlanner(const std::string& group,const XmlRpc::XmlRpcValue& config,const moveit::core::RobotModelConstPtr& model);
+  // virtual ~StompPlanner();
 
   /**
    * @brief Solve the motion planning problem as defined in the motion request passed before hand.
@@ -170,6 +186,20 @@ protected:
 
   // ros tasks
   ros::NodeHandlePtr ph_;
+
+private:
+    Eigen::MatrixXd initial_parameters_;
+    Eigen::MatrixXd parameters_; // これが最適化対象のパラメータ
+    int rows_;
+    int cols_;
+
+    // プライベートコンストラクタ（シングルトンのため）
+    // // StompPlanner() {}
+    // StompPlanner(const std::string& name, const std::string& group);
+
+    // コピーコンストラクタと代入演算子を削除（シングルトンのため）
+    StompPlanner(const StompPlanner&) = delete;
+    StompPlanner& operator=(const StompPlanner&) = delete;
 };
 
 

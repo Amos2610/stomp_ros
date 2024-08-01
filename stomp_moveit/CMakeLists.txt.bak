@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(stomp_moveit)
 
-set(stomp_DIR /home/nishidalab/catkin_ws/devel/lib/cmake/stomp)
-
 find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   eigen_conversions
@@ -16,15 +14,21 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   trac_ik_lib
   visualization_msgs
+  rospy
   message_generation
-  stomp
+  stomp_ros
 )
 
+## Add cmake_modules dependency
+find_package(cmake_modules REQUIRED)
+## Add message_generation dependency for generating messages
 find_package(message_generation REQUIRED)
+## Add stomp and Eigen3 dependencies
 find_package(stomp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
 
+## Set C++ standard to C++11
 add_definitions("-std=c++11")
 
 add_message_files(
@@ -54,7 +58,10 @@ catkin_package(
     tf
     trac_ik_lib
     visualization_msgs
+    rospy
+    message_runtime
     std_msgs
+    stomp_ros
   DEPENDS
     Boost
     EIGEN3
@@ -68,7 +75,7 @@ catkin_package(
 ## Specify additional locations of header files
 include_directories(include
     ${catkin_INCLUDE_DIRS}
-    ${stomp_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -79,13 +86,10 @@ add_library(${PROJECT_NAME}
   src/utils/polynomial.cpp
 )
 
-# add_executable(${PROJECT_NAME}_node src/stomp_moveit_node.cpp)  # コメントアウト
-
-add_executable(pathseed_callback src/pathseed_callback.cpp)
-
 target_link_libraries(${PROJECT_NAME}
   stomp::stomp
   ${catkin_LIBRARIES}
+  Eigen3::Eigen
 )
 
 # planner manager plugin
@@ -130,10 +134,8 @@ add_library(${PROJECT_NAME}_noise_generators
 target_link_libraries(${PROJECT_NAME}_noise_generators stomp::stomp ${catkin_LIBRARIES})
 
 # pathseed callback
-target_link_libraries(pathseed_callback
-  ${PROJECT_NAME}  # stomp_moveit ライブラリをリンク
-  ${catkin_LIBRARIES}
-)
+add_executable(pathseed_callback src/pathseed_callback.cpp)
+target_link_libraries(pathseed_callback ${catkin_LIBRARIES})
 
 #############
 ## Install ##
@@ -145,18 +147,21 @@ install(DIRECTORY include/${PROJECT_NAME}/
 
 ## Mark executables and/or libraries for installation
 install(TARGETS
-    ${PROJECT_NAME}
-    ${PROJECT_NAME}_cost_functions
-    ${PROJECT_NAME}_noise_generators
-    ${PROJECT_NAME}_noisy_filters
-    ${PROJECT_NAME}_planner_manager
-    ${PROJECT_NAME}_smoothing_adapter
-    ${PROJECT_NAME}_update_filters
+  ${PROJECT_NAME}
+  ${PROJECT_NAME}_cost_functions
+  ${PROJECT_NAME}_noise_generators
+  ${PROJECT_NAME}_noisy_filters
+  ${PROJECT_NAME}_planner_manager
+  ${PROJECT_NAME}_smoothing_adapter
+  ${PROJECT_NAME}_update_filters
+  pathseed_callback
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+
+## Install plugin XML files
 install(FILES
     cost_function_plugins.xml
     noise_generator_plugins.xml
@@ -167,6 +172,7 @@ install(FILES
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
+## Mark other XML files for installation
 install(
   FILES
     planner_manager_plugins.xml
