@@ -24,7 +24,6 @@
  * limitations under the License.
  */
 #include <ros/ros.h>
-#include "stomp_moveit/PathSeed.h" // Include your custom message header file
 #include <moveit/robot_state/conversions.h>
 #include <stomp_moveit/stomp_planner.h>
 #include <class_loader/class_loader.hpp>
@@ -32,7 +31,13 @@
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <stomp_moveit/utils/kinematics.h>
 #include <stomp_moveit/utils/polynomial.h>
-#include <moveit/robot_model_loader/robot_model_loader.h> // 必要なヘッダーをインクルード
+#include <stomp_moveit/PathSeed.h>
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <iostream>
+#include <sstream>
+#include <string>
+
 
 static const std::string DEBUG_NS = "stomp_planner";
 static const std::string DESCRIPTION = "STOMP";
@@ -115,54 +120,86 @@ StompPlanner::StompPlanner(const std::string& group,const XmlRpc::XmlRpcValue& c
     cols_(0),
     parameters_(Eigen::MatrixXd::Zero(1,1))
 {
+  // PathSeed subscriber
+  path_seed_subscriber_ = ph_->subscribe("path_seed", 1000, &StompPlanner::pathSeedCallback, this);
   setup();
+}
+
+// callbaxck function for the path_seed topic
+void StompPlanner::pathSeedCallback(const stomp_moveit::PathSeed::ConstPtr& msg)
+{
+    rows_ = msg->rows;
+    cols_ = msg->cols;
+
+    parameters_ = Eigen::MatrixXd(rows_, cols_);
+    int index = 0;
+    for (int i = 0; i < rows_; ++i)
+    {
+        for (int j = 0; j < cols_; ++j)
+        {
+            parameters_(i, j) = msg->data[index++];
+        }
+    }
+    
+    // For debugging
+    // ROS_INFO("Received path seed:");
+    // ROS_INFO("  Rows: %d", rows_);
+    // ROS_INFO("  Cols: %d", cols_);
+    // // Format the matrix using IOFormat
+    // Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
+    // std::stringstream ss;
+    // ss << parameters_.format(fmt);
+    // // Convert to std::string
+    // std::string parameters_str = ss.str();
+    // ROS_INFO_STREAM("Received path seed:\n" << parameters_str);
 }
 
 StompPlanner::~StompPlanner()
 {
 }
 
-// シングルトンインスタンスの取得関数の実装
-StompPlanner& StompPlanner::getInstance(const std::string& name, const std::string& robot_description) {
-    static bool initialized = false;
-    static StompPlanner* instance = nullptr;
-    if (!initialized) {
-        // Robot model loader and planning scene
-        robot_model_loader::RobotModelLoader robot_model_loader(name);
-        moveit::core::RobotModelConstPtr kinematic_model = robot_model_loader.getModel();
-        planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(kinematic_model));
-
-        // Load configuration parameters
-        XmlRpc::XmlRpcValue stomp_config;
-        ros::NodeHandle nh("~");
-        nh.getParam("stomp_config", stomp_config);
-
-        // Initialize instance
-        instance = new StompPlanner(name, stomp_config, kinematic_model);
-        initialized = true;
-    }
-
-    return *instance;
-}
-
-
 void StompPlanner::setParameters(const Eigen::MatrixXd& parameters, int rows, int cols) {
+    // For debugging
+    // // Format the matrix using IOFormat
+    // Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
+    // std::stringstream ss;
+    // ss << parameters.format(fmt);
+    // // Convert to std::string
+    // std::string parameters_str = ss.str();
+    // ROS_INFO("Setting parameters, rows: %d, cols: %d, parameters: %d", rows_, cols_, parameters_str);
     parameters_ = parameters;
     rows_ = rows;
     cols_ = cols;
 }
 
 Eigen::MatrixXd StompPlanner::getInitialParameters() const {
+    // For debugging
+    // ROS_INFO("Getting initial parameters:");
+    // // Format the matrix using IOFormat
+    // Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
+    // std::stringstream ss;
+    // ss << parameters_.format(fmt);
+    // // Convert to std::string
+    // std::string parameters_str = ss.str();
+    // ROS_INFO_STREAM("Initial parameters:\n" << parameters_str);
+
     return parameters_;
 }
 
 int StompPlanner::getRows() const {
+    // For debugging
+    // ROS_INFO("Getting rows:");
+    // ROS_INFO("  Rows: %d", rows_);
     return rows_;
 }
 
 int StompPlanner::getCols() const {
+    // For debugging
+    // ROS_INFO("Getting cols:");
+    // ROS_INFO("  Cols: %d", cols_);
     return cols_;
 }
+
 void StompPlanner::setup()
 {
   if(!getPlanningScene())
@@ -281,46 +318,36 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   }
 
   else {
-    // シングルトンインスタンスを取得
-    // シングルトンインスタンスを取得
-    StompPlanner& planner = StompPlanner::getInstance("stomp_planner", "xarm6");
-    
-    // 必要な変数を取得
-    Eigen::MatrixXd initial_parameters = planner.getInitialParameters();
-    int rows = planner.getRows();
-    int cols = planner.getCols();
+    // declearing the planner
+    StompPlanner planner("xarm6", config_, robot_model_);
     if (userInput == "y" || userInput == "Y") {
-      ROS_ERROR("Seeding trajectory from the initial trajectory you set!!!");
-      // int seed = 1;
-      // std::cout << "Enter the seed number: ";
-      // std::cin >> seed;
+      // ROS_ERROR("Seeding trajectory from the initial trajectory you set!!!");
       std::string userInput2;
-      std::cout << "Please select the seed number you want to use (1 or 2 or 3 or 4): ";
+      std::cout << "Do you want to use the pathseeds you set? (y/n): ";
       std::getline(std::cin, userInput2);
 
-      if (userInput2 == "1") {
-          // const int rows = 7;
-          // const int cols = 6;
-          // printf("rows: %d, cols: %d\n", rows, cols);
-          // initial_parameters.resize(rows, cols);
-          // printf("rows: %d, cols: %d\n", initial_parameters.rows(), initial_parameters.cols());
-          Eigen::MatrixXd initial_parameters(rows, cols);
-            /* ここに行列の初期値を設定 */
-          // initial_parameters <<
-          //       1.68629584875, -0.007575333749999996, -1.80317691875, -0.005648298750000001, 1.7902074025, 0.047071193750000004,
-          //       1.7244428675, 0.09466013250000001, -1.8137198875, -0.0084406675, 1.698638475, 0.0820520275,
-          //       1.76258988625, 0.19689559875, -1.82426285625, -0.011233036250000002, 1.6070695475, 0.11703286125000001,
-          //       1.8007369050000002, 0.29913106500000014, -1.8348058250000001, -0.014025405000000001, 1.5155006200000003, 0.152013695,
-          //       1.83888392375, 0.40136653125000005, -1.84534879375, -0.01681777375000002, 1.4239316925000005, 0.18699452874999958,
-          //       1.8770309425, 0.5036019975, -1.8558917625, -0.019610142499999983, 1.332362765, 0.2219753624999997,
-          //       1.9151779612500002, 0.6058374637500001, -1.86643473125, -0.022402511249999982, 1.2407938375000005, 0.25695619624999966;
-          
-          std::cout << "initial_parameters:" << std::endl;
-          std::cout << initial_parameters << std::endl;
+      if (userInput2 == "y" || userInput2 == "Y") {
+          // if you want to use the pathseeds you set
+          // getting initial parameters from the pathseed you set
+          Eigen::MatrixXd initial_parameters = planner.getInitialParameters();
+          int rows = planner.getRows();
+          int cols = planner.getCols();
+          // Format the matrix using IOFormat
+          Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
+          std::stringstream ss;
+          ss << initial_parameters.format(fmt);
+          // Convert to std::string
+          std::string parameters_str = ss.str();
+          ROS_INFO("|--------------------------------------------------|");
+          ROS_INFO("|  Initial Parameters from the PathSeed you set    |");
+          ROS_INFO("|--------------------------------------------------|");
+
+          std::cout << "rows: " << rows << ", cols: " << cols << std::endl;
+          ROS_INFO_STREAM("Initial parameters:\n" << parameters_str);
 
           Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-          std::cout << "initial_parameters_transpose:" << std::endl;
-          std::cout << initial_parameters_transpose << std::endl;
+          // std::cout << "initial_parameters_transpose:" << std::endl;
+          // std::cout << initial_parameters_transpose << std::endl;
           // updating time step in stomp configuraion
           config_copy.num_timesteps = initial_parameters_transpose.cols();
 
@@ -334,85 +361,6 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
           planning_success = stomp_->solve(initial_parameters_transpose, parameters);
 
       } 
-      // else if (userInput2 == "2") {
-      //     const int rows = 7;
-      //     const int cols = 6;
-      //     initial_parameters.resize(rows, cols);
-      //     Eigen::MatrixXd initial_parameters(rows, cols);
-      //     initial_parameters <<
-      //           1.9151779612500002, 0.60583746375, -1.86643473125, -0.02240251125, 1.2407938375, 0.25695619624999994,
-      //           1.8770309425, 0.5036019974999999, -1.8558917625000002, -0.0196101425, 1.332362765, 0.2219753625,
-      //           1.83888392375, 0.40136653125, -1.84534879375, -0.01681777375, 1.4239316925, 0.18699452875,
-      //           1.800736905, 0.29913106500000003, -1.8348058250000001, -0.014025405, 1.51550062, 0.152013695,
-      //           1.76258988625, 0.19689559874999996, -1.82426285625, -0.01123303625, 1.6070695475000003, 0.11703286125000004,
-      //           1.7244428675000003, 0.09466013249999974, -1.8137198875, -0.008440667499999967, 1.6986384750000003, 0.08205202749999972,
-      //           1.68629584875, -0.0075753337499999684, -1.80317691875, -0.005648298750000003, 1.7902074025, 0.047071193750000045;
-
-      //     Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-      //     std::cout << "initial_parameters_transpose:" << std::endl;
-      //     std::cout << initial_parameters_transpose << std::endl;
-      //     // updating time step in stomp configuraion
-      //     config_copy.num_timesteps = initial_parameters_transpose.cols();
-
-      //     // setting up up optimization task
-      //     if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
-      //     {
-      //       res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-      //       return false;
-      //     }
-      //     stomp_->setConfig(config_copy);
-      //     planning_success = stomp_->solve(initial_parameters_transpose, parameters);
-      // } 
-      // else if (userInput2 == "3") {
-      //     const int rows = 3;
-      //     const int cols = 6;
-      //     initial_parameters.resize(rows, cols);
-      //     Eigen::MatrixXd initial_parameters(rows, cols);
-      //     initial_parameters <<
-      //           -0.22198252750000003, 0.31958166, -2.3081405925, 0.028123977499999998, 1.97251693, -0.25972872500000005,
-      //           -0.26148721500000005, 0.41170041999999996, -2.2965480250000003, 0.027877625000000003, 1.86980945, -0.302014,
-      //           -0.30099190249999996, 0.5038191799999999, -2.2849554575, 0.0276312725, 1.7671019700000001, -0.344299275;
-
-      //     Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-      //     std::cout << "initial_parameters_transpose:" << std::endl;
-      //     std::cout << initial_parameters_transpose << std::endl;
-      //     // updating time step in stomp configuraion
-      //     config_copy.num_timesteps = initial_parameters_transpose.cols();
-
-      //     // setting up up optimization task
-      //     if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
-      //     {
-      //       res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-      //       return false;
-      //     }
-      //     stomp_->setConfig(config_copy);
-      //     planning_success = stomp_->solve(initial_parameters_transpose, parameters);
-      // }
-      // else if (userInput2=="4") {
-      //     const int rows = 3;
-      //     const int cols = 6;
-      //     initial_parameters.resize(rows, cols);
-      //     Eigen::MatrixXd initial_parameters(rows, cols);
-      //     initial_parameters <<
-      //           -1.0623765500000002, 0.5636093225000002, -1.7689483075, -0.0013158125000000036, 1.206150435, -1.0621891350000001,
-      //           -1.0094681300000001, 0.42398140500000003, -1.787502335, -0.001218785, 1.36437976, -1.0095155,
-      //           -0.9565597100000001, 0.2843534875, -1.8060563625, -0.0011217574999999999, 1.522609085, -0.956841865;
-
-      //     Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-      //     std::cout << "initial_parameters_transpose:" << std::endl;
-      //     std::cout << initial_parameters_transpose << std::endl;
-      //     // updating time step in stomp configuraion
-      //     config_copy.num_timesteps = initial_parameters_transpose.cols();
-
-      //     // setting up up optimization task
-      //     if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
-      //     {
-      //       res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-      //       return false;
-      //     }
-      //     stomp_->setConfig(config_copy);
-      //     planning_success = stomp_-> solve(initial_parameters_transpose, parameters);
-      // }
       else {
           std::cout << "Invalid seed number" << std::endl;
           return 1;
@@ -963,38 +911,3 @@ bool StompPlanner::getConfigData(ros::NodeHandle &nh, std::map<std::string, XmlR
 
 
 } /* namespace stomp_moveit_interface */
-
-// // Define a callback function to process incoming PathSeed messages
-// void chatterCallback(const stomp_moveit::PathSeed::ConstPtr& msg)
-// {
-//   int rows = msg->rows;
-//   int cols = msg->cols;
-
-//   // Convert data vector to Eigen::MatrixXd
-//   Eigen::MatrixXd initial_parameters(rows, cols);
-//   int index = 0;
-//   for (int i = 0; i < rows; ++i) {
-//     for (int j = 0; j < cols; ++j) {
-//       initial_parameters(i, j) = msg->data[index++];
-//     }
-//   }
-
-//   std::cout << "Received matrix data:\n" << initial_parameters << std::endl;
-
-//   // Now you can use initial_parameters, rows, and cols in your StompPlanner class methods
-//   // For example:
-//   // stomp_planner.solve(initial_parameters, rows, cols); // Adjust this according to your class structure
-// }
-
-// int main(int argc, char **argv)
-// {
-//   ros::init(argc, argv, "stomp_planner");
-//   ros::NodeHandle nh;
-
-//   // Create a subscriber to receive PathSeed messages
-//   ros::Subscriber sub = nh.subscribe("path_seed", 1000, chatterCallback);
-
-//   ros::spin();
-
-//   return 0;
-// }
