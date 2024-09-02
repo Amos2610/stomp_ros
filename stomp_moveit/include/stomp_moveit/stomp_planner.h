@@ -32,6 +32,7 @@
 #include <stomp_moveit/utils/kinematics.h>
 #include <boost/thread.hpp>
 #include <ros/ros.h>
+#include <stomp_moveit/PathSeed.h>
 
 namespace stomp_moveit
 {
@@ -54,8 +55,13 @@ public:
    * @param config  The parameter containing the configuration data for this planning group, includes plugins specifications.
    * @param model   A pointer to the robot model.
    */
-  StompPlanner(const std::string& group,const XmlRpc::XmlRpcValue& config,const moveit::core::RobotModelConstPtr& model);
+  StompPlanner(const std::string& group, const XmlRpc::XmlRpcValue& config, const moveit::core::RobotModelConstPtr& model);
   virtual ~StompPlanner();
+  
+  void setParameters(const Eigen::MatrixXd& parameters, int rows, int cols);
+  Eigen::MatrixXd getInitialParameters() const;
+  int getRows() const;
+  int getCols() const;
 
   /**
    * @brief Solve the motion planning problem as defined in the motion request passed before hand.
@@ -170,6 +176,15 @@ protected:
 
   // ros tasks
   ros::NodeHandlePtr ph_;
+
+private:
+    // For PathSeed (callback function for receiving pathseed massage)
+    void pathSeedCallback(const stomp_moveit::PathSeed::ConstPtr& msg);
+    ros::Subscriber path_seed_subscriber_;  // Added: declear subscriber as class menber
+    // Eigen::MatrixXd initial_parameters_;
+    Eigen::MatrixXd parameters_;
+    int rows_;
+    int cols_;
 };
 
 
