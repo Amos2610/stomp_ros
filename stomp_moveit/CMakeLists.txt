@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(stomp_moveit)
 
-set(stomp_DIR /home/nishidalab/catkin_ws/devel/lib/cmake/stomp)
-
 find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   eigen_conversions
@@ -16,11 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   trac_ik_lib
   visualization_msgs
-  message_generation
-  stomp
 )
 
-find_package(message_generation REQUIRED)
 find_package(stomp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
@@ -32,10 +27,6 @@ add_message_files(
   PathSeed.msg
 )
 
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-)
 
 ###################################
 ## catkin specific configuration ##
@@ -54,7 +45,6 @@ catkin_package(
     tf
     trac_ik_lib
     visualization_msgs
-    std_msgs
   DEPENDS
     Boost
     EIGEN3
@@ -68,7 +58,6 @@ catkin_package(
 ## Specify additional locations of header files
 include_directories(include
     ${catkin_INCLUDE_DIRS}
-    ${stomp_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -79,9 +68,7 @@ add_library(${PROJECT_NAME}
   src/utils/polynomial.cpp
 )
 
-# add_executable(${PROJECT_NAME}_node src/stomp_moveit_node.cpp)  # コメントアウト
-
-add_executable(pathseed_callback src/pathseed_callback.cpp)
+# add_executable(pathseed_callback src/pathseed_callback.cpp)
 
 target_link_libraries(${PROJECT_NAME}
   stomp::stomp
@@ -130,10 +117,10 @@ add_library(${PROJECT_NAME}_noise_generators
 target_link_libraries(${PROJECT_NAME}_noise_generators stomp::stomp ${catkin_LIBRARIES})
 
 # pathseed callback
-target_link_libraries(pathseed_callback
-  ${PROJECT_NAME}  # stomp_moveit ライブラリをリンク
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(pathseed_callback
+#   ${PROJECT_NAME}  # stomp_moveit ライブラリをリンク
+#   ${catkin_LIBRARIES}
+# )
 
 #############
 ## Install ##
@@ -178,4 +165,3 @@ install(
 #############
 ## Testing ##
 #############
-
