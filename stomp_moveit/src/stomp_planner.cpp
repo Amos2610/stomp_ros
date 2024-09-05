@@ -239,27 +239,50 @@ void StompPlanner::setup()
 
 }
 
+
+// モーションプランニングを実行し、プランニングが成功したかどうかを返す
 bool StompPlanner::solve(planning_interface::MotionPlanResponse &res)
 {
+  // プランニングの開始時刻を記録
   ros::WallTime start_time = ros::WallTime::now();
+  
+  // 詳細なプランニングレスポンス用オブジェクト
   planning_interface::MotionPlanDetailedResponse detailed_res;
+
+  // solve(detailed_res) によってモーションプランニングを実行し、成功したかどうかを success に格納
   bool success = solve(detailed_res);
-  if(success)
+
+  // プランニングが成功した場合、最終的な trajectory をレスポンスに設定
+  if (success)
   {
-    res.trajectory_ = detailed_res.trajectory_.back();
+    res.trajectory_ = detailed_res.trajectory_.back();  // trajectory の最後の軌道を res に格納
   }
+
+  // プランニングにかかった時間を計算し、レスポンスに設定
   ros::WallDuration wd = ros::WallTime::now() - start_time;
   res.planning_time_ = ros::Duration(wd.sec, wd.nsec).toSec();
+
+  // エラーコードをレスポンスに設定
   res.error_code_ = detailed_res.error_code_;
 
+  // プランニングの成功/失敗を返す
   return success;
 }
 
+
 bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
 {
-  std::string userInput;
-  std::cout << "Do you want to use the initial trajectory you set (y/n): ";
-  std::getline(std::cin, userInput);
+  bool use_pathseed = false;
+
+  // ROSパラメータから値を取得
+  if (!ros::param::get("use_pathseed", use_pathseed))
+  {
+      // パラメータが設定されていない場合はデフォルト値を使用
+      use_pathseed = false;
+      ROS_WARN("Parameter 'use_pathseed' not set. Using default value: false");
+  }
+  ROS_INFO("use_pathseed: %s", use_pathseed ? "true" : "false");
+
   using namespace stomp;
 
   // initializing response
@@ -320,53 +343,67 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   else {
     // declearing the planner
     StompPlanner planner("xarm6", config_, robot_model_);
-    if (userInput == "y" || userInput == "Y") {
-      // ROS_ERROR("Seeding trajectory from the initial trajectory you set!!!");
-      std::string userInput2;
-      std::cout << "Do you want to use the pathseeds you set? (y/n): ";
-      std::getline(std::cin, userInput2);
+    
+    // Check and obtain initial parameters, retry if necessary
+    const int max_retries = 3;  // Maximum number of retries
+    const double sleep_duration = 0.5;  // Sleep duration in seconds
 
-      if (userInput2 == "y" || userInput2 == "Y") {
-          // if you want to use the pathseeds you set
-          // getting initial parameters from the pathseed you set
-          Eigen::MatrixXd initial_parameters = planner.getInitialParameters();
-          int rows = planner.getRows();
-          int cols = planner.getCols();
-          // Format the matrix using IOFormat
-          Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
-          std::stringstream ss;
-          ss << initial_parameters.format(fmt);
-          // Convert to std::string
-          std::string parameters_str = ss.str();
-          ROS_INFO("|--------------------------------------------------|");
-          ROS_INFO("|  Initial Parameters from the PathSeed you set    |");
-          ROS_INFO("|--------------------------------------------------|");
+    Eigen::MatrixXd initial_parameters;
+    int rows, cols;
+    int retries = 0;
 
+    if (use_pathseed == true) {  
+      // Loop to retry obtaining initial_parameters if they are empty
+      while (retries < max_retries) {
+          ROS_INFO("Attempting to obtain initial parameters from the PathSeed...");
+          initial_parameters = planner.getInitialParameters();
+          rows = planner.getRows();
+          cols = planner.getCols();
           std::cout << "rows: " << rows << ", cols: " << cols << std::endl;
-          ROS_INFO_STREAM("Initial parameters:\n" << parameters_str);
-
-          Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-          // std::cout << "initial_parameters_transpose:" << std::endl;
-          // std::cout << initial_parameters_transpose << std::endl;
-          // updating time step in stomp configuraion
-          config_copy.num_timesteps = initial_parameters_transpose.cols();
-
-          // setting up up optimization task
-          if(!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_))
-          {
-            res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-            return false;
+          // Check if the initial_parameters are valid (non-zero size)
+          if (rows > 0 && cols > 0) {
+              ROS_INFO("Initial parameters obtained successfully.");
+              break;
+          } else {
+              ROS_WARN("Initial parameters are empty. Retrying...");
+              ros::Duration(sleep_duration).sleep();  // Sleep before retrying
+              retries++;
+              if (retries == max_retries) {
+                  ROS_WARN("Failed to obtain initial parameters after %d retries.", max_retries);
+                  use_pathseed = false;  // Set use_pathseed to false to proceed without pathseed    
+              }
           }
-          stomp_->setConfig(config_copy);
-          planning_success = stomp_->solve(initial_parameters_transpose, parameters);
-
-      } 
-      else {
-          std::cout << "Invalid seed number" << std::endl;
-          return 1;
       }
     }
-    if (userInput == "n" || userInput == "N") {
+    if (use_pathseed == true) {
+      // If we are using pathseed, proceed with pathseed-based planning
+        ROS_INFO("|--------------------------------------------------|");
+        ROS_INFO("|  Initial Parameters from the PathSeed you set    |");
+        ROS_INFO("|--------------------------------------------------|");
+
+        Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
+        std::stringstream ss;
+        ss << initial_parameters.format(fmt);
+        std::string parameters_str = ss.str();
+
+        std::cout << "rows: " << rows << ", cols: " << cols << std::endl;
+        ROS_INFO_STREAM("Initial parameters:\n" << parameters_str);
+
+        Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
+        config_copy.num_timesteps = initial_parameters_transpose.cols();
+
+        // Setting up optimization task
+        if (!task_->setMotionPlanRequest(planning_scene_, request_, config_copy, res.error_code_)) {
+            ROS_ERROR("Failed to set motion plan request. Check your PathSeed and request parameters.");
+            res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+            return false;
+        }
+        stomp_->setConfig(config_copy);
+        planning_success = stomp_->solve(initial_parameters_transpose, parameters);
+    }
+    else {
+      // if you don't want to use the pathseeds you set
+      ROS_INFO("Not using pathseed you set.");
       // extracting start and goal
       Eigen::VectorXd start, goal;
       if(!getStartAndGoal(start,goal))
