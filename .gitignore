@@ -32,3 +32,6 @@ test_results
 
 # stomp_moveit/build
 stomp_moveit/build
+
+# vscode
+.vscode

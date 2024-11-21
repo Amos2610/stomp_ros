@@ -197,13 +197,6 @@ public:
    */
   virtual void done(bool success,int total_iterations,double final_cost,const Eigen::MatrixXd& parameters) override;
 
-protected:
-
-  // robot environment
-  std::string group_name_;
-  moveit::core::RobotModelConstPtr robot_model_ptr_;
-  planning_scene::PlanningSceneConstPtr planning_scene_ptr_;
-
   /**< The plugin loaders for each type of plugin supported>*/
   CostFuctionLoaderPtr cost_function_loader_;
   NoisyFilterLoaderPtr noisy_filter_loader_;
@@ -215,6 +208,15 @@ protected:
   std::vector<noisy_filters::StompNoisyFilterPtr> noisy_filters_;
   std::vector<update_filters::StompUpdateFilterPtr> update_filters_;
   std::vector<noise_generators::StompNoiseGeneratorPtr> noise_generators_;
+
+protected:
+
+  // robot environment
+  std::string group_name_;
+  moveit::core::RobotModelConstPtr robot_model_ptr_;
+  planning_scene::PlanningSceneConstPtr planning_scene_ptr_;
+
+  
 };
 
 

@@ -67,8 +67,6 @@ bool parsePluginConfigs(XmlRpc::XmlRpcValue config,
   }
   else
   {
-    ROS_WARN("Plugin under entry '%s' was not found in ros parameter.",param_name.c_str());
-    ROS_DEBUG("Failed to find plugin under entry '%s' in ros parameter %s",param_name.c_str(),config.toXml().c_str());
     return false;
   }
 
@@ -123,7 +121,6 @@ bool loadPlugins(const PluginData plugin_data,
         }
         else
         {
-          ROS_WARN("%s plugin '%s' could not be created",plugin_data.plugin_desc.c_str() ,entry.first.c_str());
           continue;
         }
       }
@@ -132,7 +129,7 @@ bool loadPlugins(const PluginData plugin_data,
       if(plugin->initialize(plugin_data.robot_model,plugin_data.group_name,entry.second))
       {
         plugin_array.push_back(plugin);
-        ROS_INFO_STREAM("Stomp Optimization Task loaded "<< plugin_data.plugin_desc <<" '"<<plugin->getName()<<"' plugin");
+        // ROS_INFO_STREAM("Stomp Optimization Task loaded "<< plugin_data.plugin_desc <<" '"<<plugin->getName()<<"' plugin");
       }
       else
       {
@@ -143,7 +140,7 @@ bool loadPlugins(const PluginData plugin_data,
         }
         else
         {
-          ROS_WARN("%s plugin '%s' failed to initialize",plugin_data.plugin_desc.c_str(), entry.first.c_str());
+          // ROS_WARN("%s plugin '%s' failed to initialize",plugin_data.plugin_desc.c_str(), entry.first.c_str());
           continue;
         }
       }
@@ -164,7 +161,7 @@ bool loadPlugins(const PluginData plugin_data,
     std::for_each(plugins.begin(),plugins.end(),arrayToString);
     ss<<"]";
 
-    ROS_DEBUG("Loaded %s plugins: %s", plugin_data.plugin_desc.c_str(), ss.str().c_str());
+    // ROS_INFO("Loaded %s plugins: %s", plugin_data.plugin_desc.c_str(), ss.str().c_str());
   }
   else
   {
@@ -184,6 +181,7 @@ StompOptimizationTask::StompOptimizationTask(
         robot_model_ptr_(robot_model_ptr),
         group_name_(group_name)
 {
+  // ROS_WARN("Creating StompOptimizationTask");
   // initializing plugin loaders
   cost_function_loader_.reset(new CostFunctionLoader("stomp_moveit", "stomp_moveit::cost_functions::StompCostFunction"));
   noise_generator_loader_.reset(new NoiseGeneratorLoader("stomp_moveit","stomp_moveit::noise_generators::StompNoiseGenerator"));
@@ -206,6 +204,7 @@ StompOptimizationTask::StompOptimizationTask(
     ROS_ERROR("StompOptimizationTask/%s failed to load '%s' plugins from yaml",group_name.c_str(),COST_FUNCTIONS_FIELD.c_str());
     throw std::logic_error("plugin not found");
   }
+  // ROS_INFO("Loaded %lu cost functions",cost_functions_.size());
 
   // loading noise generators
   plugin_data.param_key = NOISE_GENERATOR_FIELD;
@@ -218,6 +217,7 @@ StompOptimizationTask::StompOptimizationTask(
              NOISE_GENERATOR_FIELD.c_str());
     throw std::logic_error("plugin not found");
   }
+  // ROS_INFO("Loaded %lu noise generators",noise_generators_.size());
 
   // loading noisy filter plugins
   plugin_data.param_key = NOISY_FILTERS_FIELD;
@@ -226,8 +226,9 @@ StompOptimizationTask::StompOptimizationTask(
   plugin_data.single_instance = false;
   if(!loadPlugins(plugin_data,noisy_filter_loader_,noisy_filters_))
   {
-    ROS_WARN("StompOptimizationTask/%s failed to load '%s' plugins from yaml",group_name.c_str(),NOISY_FILTERS_FIELD.c_str());
+    // ROS_WARN("StompOptimizationTask/%s failed to load '%s' plugins from yaml",group_name.c_str(),NOISY_FILTERS_FIELD.c_str());
   }
+  // ROS_INFO("Loaded %lu noisy filters",noisy_filters_.size());
 
   // loading filter plugins
   plugin_data.param_key = UPDATE_FILTERS_FIELD;
@@ -236,13 +237,15 @@ StompOptimizationTask::StompOptimizationTask(
   plugin_data.single_instance = false;
   if(!loadPlugins(plugin_data,update_filter_loader_,update_filters_))
   {
-    ROS_WARN("StompOptimizationTask/%s failed to load '%s' plugins from yaml",group_name.c_str(),UPDATE_FILTERS_FIELD.c_str());
+    // ROS_WARN("StompOptimizationTask/%s failed to load '%s' plugins from yaml",group_name.c_str(),UPDATE_FILTERS_FIELD.c_str());
   }
+  // ROS_INFO("Loaded %lu update filters",update_filters_.size());
 }
 
 StompOptimizationTask::~StompOptimizationTask()
 {
   // TODO Auto-generated destructor stub
+  // ROS_INFO("Destroying StompOptimizationTask");
 }
 
 bool StompOptimizationTask::generateNoisyParameters(const Eigen::MatrixXd& parameters,
@@ -253,6 +256,8 @@ bool StompOptimizationTask::generateNoisyParameters(const Eigen::MatrixXd& param
                                      Eigen::MatrixXd& parameters_noise,
                                      Eigen::MatrixXd& noise)
 {
+  // ROS_WARN("Generating noisy parameters");
+  // ROS_INFO("Parameters: %lu x %lu",parameters.rows(),parameters.cols());
   return noise_generators_.back()->generateNoise(parameters,start_timestep,num_timesteps,iteration_number,rollout_number,
                                                  parameters_noise,noise);
 }
@@ -265,6 +270,7 @@ bool StompOptimizationTask::computeNoisyCosts(const Eigen::MatrixXd& parameters,
                                          Eigen::VectorXd& costs,
                                          bool& validity)
 {
+  // ROS_WARN("Computing noisy costs");
   Eigen::MatrixXd cost_matrix = Eigen::MatrixXd::Zero(num_timesteps,cost_functions_.size());
   Eigen::VectorXd state_costs = Eigen::VectorXd::Zero(num_timesteps);
   validity = true;
@@ -281,8 +287,10 @@ bool StompOptimizationTask::computeNoisyCosts(const Eigen::MatrixXd& parameters,
     validity &= valid;
 
     cost_matrix.col(i) = state_costs * cf->getWeight();
+    // ROS_INFO("Costs: %lu x %lu",costs.rows(),costs.cols());
   }
   costs = cost_matrix.rowwise().sum();
+  // ROS_INFO("Costs: %lu x %lu",costs.rows(),costs.cols());
   return true;
 }
 
@@ -293,6 +301,20 @@ bool StompOptimizationTask::computeCosts(const Eigen::MatrixXd& parameters,
                                          Eigen::VectorXd& costs,
                                          bool& validity)
 {
+  // ROS_WARN("Computing costs");
+  // ROS_INFO("Parameters: %lu x %lu",parameters.rows(),parameters.cols());
+  // ROS_INFO("Start timestep: %lu",start_timestep);
+  // ROS_INFO("Num timesteps: %lu",num_timesteps);
+  // ROS_INFO("Iteration number: %d",iteration_number);
+  // ROS_INFO("Costs: %lu x %lu",costs.rows(),costs.cols());
+  // ROS_INFO("Validity: %d",validity);
+
+  // debug cost functions
+  // ROS_INFO("Cost functions size: %lu",cost_functions_.size());
+  for(auto i = 0u; i < cost_functions_.size(); i++ )
+  {
+    // ROS_INFO("Cost function %s",cost_functions_[i]->getName().c_str());
+  }
   Eigen::MatrixXd cost_matrix = Eigen::MatrixXd::Zero(num_timesteps,cost_functions_.size());
   Eigen::VectorXd state_costs = Eigen::VectorXd::Zero(num_timesteps);
   validity = true;
@@ -311,6 +333,12 @@ bool StompOptimizationTask::computeCosts(const Eigen::MatrixXd& parameters,
     cost_matrix.col(i) = state_costs * cf->getWeight();
   }
   costs = cost_matrix.rowwise().sum();
+  // debug costs (not only rows, cols)
+  // for (size_t i = 0; i < costs.size(); ++i)
+  // {
+  //   ROS_INFO("Costs[%lu]: %f", i, costs[i]);
+  // }
+  
   return true;
 }
 
