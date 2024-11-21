@@ -322,7 +322,6 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
   Eigen::MatrixXd parameters;
   bool planning_success;
 
-  // ROS_WARN("----------------- Get Parameters -----------------");
   // Load optimization parameters from rosparam
   ros::param::get("move_group/stomp/xarm6/optimization/num_timesteps", stomp_config_.num_timesteps);
   ros::param::get("move_group/stomp/xarm6/optimization/num_iterations", stomp_config_.num_iterations);
@@ -479,87 +478,85 @@ bool StompPlanner::solve(planning_interface::MotionPlanDetailedResponse &res)
       ros::WallTime end_time_parameter_parsing = ros::WallTime::now();
       ros::WallDuration duration_parameter_parsing = end_time_parameter_parsing - start_time_parameter_parsing;
       ROS_INFO("##Time taken for parameter parsing: %f seconds", duration_parameter_parsing.toSec());
-    }
-    if (use_pathseed == true) {
       // If we are using pathseed, proceed with pathseed-based planning
-        ROS_INFO("|--------------------------------------------------|");
-        ROS_INFO("|  Initial Parameters from the PathSeed you set    |");
-        ROS_INFO("|--------------------------------------------------|");
+      ROS_INFO("|--------------------------------------------------|");
+      ROS_INFO("|  Initial Parameters from the PathSeed you set    |");
+      ROS_INFO("|--------------------------------------------------|");
 
-        // meassure time of parameter parsing
-        ros::WallTime start_time_parameter_parsing = ros::WallTime::now();
+      // meassure time of parameter parsing
+      ros::WallTime start_time_parameter_parsing = ros::WallTime::now();
 
-        // ROS_WARN("----------------- Get Parameters -----------------");
-        // Load optimization parameters from rosparam
-        ros::param::get("move_group/stomp/xarm6/optimization/num_timesteps", stomp_config_.num_timesteps);
-        ros::param::get("move_group/stomp/xarm6/optimization/num_iterations", stomp_config_.num_iterations);
-        ros::param::get("move_group/stomp/xarm6/optimization/num_iterations_after_valid", stomp_config_.num_iterations_after_valid);
-        ros::param::get("move_group/stomp/xarm6/optimization/num_rollouts", stomp_config_.num_rollouts);
-        ros::param::get("move_group/stomp/xarm6/optimization/max_rollouts", stomp_config_.max_rollouts);
-        ros::param::get("move_group/stomp/xarm6/optimization/initialization_method", stomp_config_.initialization_method);
-        ros::param::get("move_group/stomp/xarm6/optimization/control_cost_weight", stomp_config_.control_cost_weight);
+      // ROS_WARN("----------------- Get Parameters -----------------");
+      // Load optimization parameters from rosparam
+      ros::param::get("move_group/stomp/xarm6/optimization/num_timesteps", stomp_config_.num_timesteps);
+      ros::param::get("move_group/stomp/xarm6/optimization/num_iterations", stomp_config_.num_iterations);
+      ros::param::get("move_group/stomp/xarm6/optimization/num_iterations_after_valid", stomp_config_.num_iterations_after_valid);
+      ros::param::get("move_group/stomp/xarm6/optimization/num_rollouts", stomp_config_.num_rollouts);
+      ros::param::get("move_group/stomp/xarm6/optimization/max_rollouts", stomp_config_.max_rollouts);
+      ros::param::get("move_group/stomp/xarm6/optimization/initialization_method", stomp_config_.initialization_method);
+      ros::param::get("move_group/stomp/xarm6/optimization/control_cost_weight", stomp_config_.control_cost_weight);
 
-        // debug
-        // ROS_INFO("num_timesteps: %d", stomp_config_.num_timesteps);
-        // ROS_INFO("num_iterations: %d", stomp_config_.num_iterations);
-        // ROS_INFO("num_iterations_after_valid: %d", stomp_config_.num_iterations_after_valid);
-        // ROS_INFO("num_rollouts: %d", stomp_config_.num_rollouts);
-        // ROS_INFO("max_rollouts: %d", stomp_config_.max_rollouts);
-        // ROS_INFO("initialization_method: %d", stomp_config_.initialization_method);
-        // ROS_INFO("control_cost_weight: %f", stomp_config_.control_cost_weight);
+      // debug
+      // ROS_INFO("num_timesteps: %d", stomp_config_.num_timesteps);
+      // ROS_INFO("num_iterations: %d", stomp_config_.num_iterations);
+      // ROS_INFO("num_iterations_after_valid: %d", stomp_config_.num_iterations_after_valid);
+      // ROS_INFO("num_rollouts: %d", stomp_config_.num_rollouts);
+      // ROS_INFO("max_rollouts: %d", stomp_config_.max_rollouts);
+      // ROS_INFO("initialization_method: %d", stomp_config_.initialization_method);
+      // ROS_INFO("control_cost_weight: %f", stomp_config_.control_cost_weight);
 
-        // For debugging the initial parameters
-        // Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
-        // std::stringstream ss;
-        // ss << initial_parameters.format(fmt);
-        // std::string parameters_str = ss.str();
+      // For debugging the initial parameters
+      // Eigen::IOFormat fmt(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "\n", "[", "]");
+      // std::stringstream ss;
+      // ss << initial_parameters.format(fmt);
+      // std::string parameters_str = ss.str();
 
-        // std::cout << "rows: " << rows << ", cols: " << cols << std::endl;
-        // ROS_INFO_STREAM("Initial parameters:\n" << parameters_str);
+      // std::cout << "rows: " << rows << ", cols: " << cols << std::endl;
+      // ROS_INFO_STREAM("Initial parameters:\n" << parameters_str);
 
-        Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
-        stomp_config_.num_timesteps = initial_parameters_transpose.cols();
+      Eigen::MatrixXd initial_parameters_transpose = initial_parameters.transpose();
+      stomp_config_.num_timesteps = initial_parameters_transpose.cols();
 
-        // Get the start and goal positions
-        Eigen::VectorXd start, goal;
-        if (!getStartAndGoal(start, goal)) {
-            res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN;
-            return false;
-        }
+      // Get the start and goal positions
+      Eigen::VectorXd start, goal;
+      if (!getStartAndGoal(start, goal)) {
+          res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN;
+          return false;
+      }
 
-        // Ensure the initial trajectory starts and ends at the correct positions
-        if (start.size() == initial_parameters_transpose.rows() && 
-            goal.size() == initial_parameters_transpose.rows()) {
-            initial_parameters_transpose.col(0) = start;  // Set start
-            initial_parameters_transpose.col(initial_parameters_transpose.cols() - 1) = goal;  // Set goal
-            ROS_INFO("Updated the initial trajectory to match the start and goal.");
-        } else {
-            ROS_ERROR("Mismatch between the number of joints in start/goal and the pathseed.");
-            res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-            return false;
-        }
+      // Ensure the initial trajectory starts and ends at the correct positions
+      if (start.size() == initial_parameters_transpose.rows() && 
+          goal.size() == initial_parameters_transpose.rows()) {
+          initial_parameters_transpose.col(0) = start;  // Set start
+          initial_parameters_transpose.col(initial_parameters_transpose.cols() - 1) = goal;  // Set goal
+          ROS_INFO("Updated the initial trajectory to match the start and goal.");
+      } else {
+          ROS_ERROR("Mismatch between the number of joints in start/goal and the pathseed.");
+          res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+          return false;
+      }
 
-        // ROS_WARN("----------------- Settting up Optimization Task -----------------");
-        // Setting up optimization task
-        if (!task_->setMotionPlanRequest(planning_scene_, request_, stomp_config_, res.error_code_)) {
-            ROS_ERROR("Failed to set motion plan request. Check your PathSeed and request parameters.");
-            res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-            return false;
-        }
-        stomp_->setConfig(stomp_config_);
-        // meassure time_of_parameter_parsing
-        ros::WallTime end_time_parameter_parsing = ros::WallTime::now();
-        ros::WallDuration duration_parameter_parsing = end_time_parameter_parsing - start_time_parameter_parsing;
-        ROS_INFO("###Time taken for parameter parsing: %f seconds", duration_parameter_parsing.toSec());
+      // ROS_WARN("----------------- Settting up Optimization Task -----------------");
+      // Setting up optimization task
+      if (!task_->setMotionPlanRequest(planning_scene_, request_, stomp_config_, res.error_code_)) {
+          ROS_ERROR("Failed to set motion plan request. Check your PathSeed and request parameters.");
+          res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+          return false;
+      }
+      stomp_->setConfig(stomp_config_);
+      // meassure time_of_parameter_parsing
+      ros::WallTime end_time_parameter_parsing = ros::WallTime::now();
+      ros::WallDuration duration_parameter_parsing = end_time_parameter_parsing - start_time_parameter_parsing;
+      ROS_INFO("###Time taken for parameter parsing: %f seconds", duration_parameter_parsing.toSec());
 
-        // ROS_WARN("----------------- Solve -----------------");
-        // measure time
-        ros::WallTime start_time_plan = ros::WallTime::now();
-        planning_success = stomp_->solve(initial_parameters_transpose, parameters);
-        ros::WallDuration wd_plan = ros::WallTime::now() - start_time_plan;
-        ROS_INFO("##########STOMP found a valid path after %f seconds", wd_plan.toSec());
-        ROS_INFO("Planning success: %s", planning_success ? "true" : "false");
-        ROS_INFO("----------------- End of PathSeed -----------------");
+      // ROS_WARN("----------------- Solve -----------------");
+      // measure time
+      ros::WallTime start_time_plan = ros::WallTime::now();
+      planning_success = stomp_->solve(initial_parameters_transpose, parameters);
+      ros::WallDuration wd_plan = ros::WallTime::now() - start_time_plan;
+      ROS_INFO("##########STOMP found a valid path after %f seconds", wd_plan.toSec());
+      ROS_INFO("Planning success: %s", planning_success ? "true" : "false");
+      ROS_INFO("----------------- End of PathSeed -----------------");
     }
     else {
       // if you don't want to use the pathseeds you set
