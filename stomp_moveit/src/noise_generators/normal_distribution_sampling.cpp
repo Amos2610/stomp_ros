@@ -77,33 +77,65 @@ bool NormalDistributionSampling::initialize(moveit::core::RobotModelConstPtr rob
 
 bool NormalDistributionSampling::configure(const XmlRpc::XmlRpcValue& config)
 {
-  using namespace XmlRpc;
+  ros::NodeHandle nh("~");
+  std::string param_path = "/move_group/stomp/xarm6/task/noise_generator";
+  XmlRpc::XmlRpcValue noise_generator_config;
 
-  try
+  // パラメータ全体を取得
+  if (!nh.getParam(param_path, noise_generator_config))
   {
-    XmlRpcValue c = config;
-    XmlRpcValue stddev_param = c["stddev"];
-
-    if(stddev_param.size() < stddev_.size())
-    {
-      ROS_ERROR("%s the 'stddev' parameter has fewer elements than the number of joints",getName().c_str());
-      return false;
-    }
-
-    stddev_.resize(stddev_param.size());
-    for(auto i = 0u; i < stddev_param.size(); i++)
-    {
-      stddev_[i] = static_cast<double>(stddev_param[i]);
-    }
-  }
-  catch(XmlRpc::XmlRpcException& e)
-  {
-    ROS_ERROR("%s failed to load parameters",getName().c_str());
+    ROS_ERROR("%s: Failed to load parameter at '%s'", getName().c_str(), param_path.c_str());
     return false;
   }
 
-  return true;
+  // 取得した値をコンソールに出力
+  ROS_INFO_STREAM("Parameter retrieved from '" << param_path << "': " << noise_generator_config);
+
+
+  // noise_generatorがリスト形式であることを確認
+  if (noise_generator_config.getType() != XmlRpc::XmlRpcValue::TypeArray)
+  {
+    ROS_ERROR("%s: Parameter at '%s' is not an array.", getName().c_str(), param_path.c_str());
+    return false;
+  }
+
+  // noise_generatorの中からstddevを探す
+  for (int i = 0; i < noise_generator_config.size(); i++)
+  {
+    if (noise_generator_config[i].hasMember("stddev"))
+    {
+      XmlRpc::XmlRpcValue stddev_param = noise_generator_config[i]["stddev"];
+
+      // stddevがリスト形式であることを確認
+      if (stddev_param.getType() != XmlRpc::XmlRpcValue::TypeArray)
+      {
+        ROS_ERROR("%s: 'stddev' is not a list.", getName().c_str());
+        return false;
+      }
+
+      // サイズチェック
+      if (stddev_param.size() < stddev_.size())
+      {
+        ROS_ERROR("%s: The 'stddev' parameter has fewer elements (%d) than the number of joints (%lu).",
+                  getName().c_str(), stddev_param.size(), stddev_.size());
+        return false;
+      }
+
+      // stddevの値を設定
+      for (int j = 0; j < stddev_param.size(); j++)
+      {
+        stddev_[j] = static_cast<double>(stddev_param[j]);
+        ROS_INFO("%s: stddev[%d] = %f", getName().c_str(), j, stddev_[j]);
+      }
+
+      return true;
+    }
+  }
+
+  ROS_ERROR("%s: Parameter 'stddev' not found in '%s'", getName().c_str(), param_path.c_str());
+  return false;
 }
+
 
 bool NormalDistributionSampling::setMotionPlanRequest(const planning_scene::PlanningSceneConstPtr& planning_scene,
                  const moveit_msgs::MotionPlanRequest &req,
